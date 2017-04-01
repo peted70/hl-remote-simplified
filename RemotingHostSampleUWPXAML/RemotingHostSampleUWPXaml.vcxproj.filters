@@ -23,6 +23,15 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
       <Filter>Assets</Filter>
     </Image>
+    <Filter Include="Common">
+      <UniqueIdentifier>{ea63b78f-9170-483b-8e8f-63e3c6e83a57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content">
+      <UniqueIdentifier>{ea3a6c31-18af-4f57-9315-5d7154e25237}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content\HLSL">
+      <UniqueIdentifier>{cb8c0c1c-4b1a-40ec-a6cf-f147f5059236}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
@@ -30,10 +39,62 @@
   <ItemGroup>
     <ClCompile Include="App.xaml.cpp" />
     <ClCompile Include="RemotingPage.xaml.cpp" />
+    <ClCompile Include="..\RemotingHostSampleShared\Common\CameraResources.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RemotingHostSampleShared\Common\DeviceResources.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RemotingHostSampleShared\Content\RenderableObject.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RemotingHostSampleShared\Content\SpatialInputHandler.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RemotingHostSampleShared\Content\SpatialInputRenderer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RemotingHostSampleShared\Content\SpinningCubeRenderer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RemotingHostSampleShared\AppMain.cpp" />
+    <ClCompile Include="..\RemotingHostSampleShared\pch.cpp" />
+    <ClCompile Include="HolographicRemoteConnection.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.xaml.h" />
     <ClInclude Include="RemotingPage.xaml.h" />
+    <ClInclude Include="..\RemotingHostSampleShared\Common\CameraResources.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Common\DeviceResources.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Common\DirectXHelper.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Common\StepTimer.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Content\RenderableObject.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Content\ShaderStructures.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Content\SpatialInputHandler.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Content\SpatialInputRenderer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\Content\SpinningCubeRenderer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\RemotingHostSampleShared\AppMain.h" />
+    <ClInclude Include="..\RemotingHostSampleShared\pch.h" />
+    <ClInclude Include="HolographicRemoteConnection.h" />
+    <ClInclude Include="DebugLog.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\StoreLogo.png">
@@ -43,8 +104,21 @@
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
   </ItemGroup>
- 
   <ItemGroup>
     <Page Include="RemotingPage.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\RemotingHostSampleShared\Content\GeometryShader.hlsl">
+      <Filter>Content\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="..\RemotingHostSampleShared\Content\PixelShader.hlsl">
+      <Filter>Content\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="..\RemotingHostSampleShared\Content\VertexShader.hlsl">
+      <Filter>Content\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="..\RemotingHostSampleShared\Content\VPRTVertexShader.hlsl">
+      <Filter>Content\HLSL</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

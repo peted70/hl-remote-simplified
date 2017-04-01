@@ -22,6 +22,7 @@
 #include "AppMain.h"
 #include "AppView.h"
 #include <HolographicStreamerHelpers.h>
+#include "HolographicRemoteConnection.h"
 
 namespace RemotingHostSample
 {
@@ -38,33 +39,19 @@ namespace RemotingHostSample
         void LoadInternalState(Windows::Foundation::Collections::IPropertySet^ state);
 
     private:
+		void OnInit(HolographicSpace ^ space, RemoteSpeech ^ speech);
+		void OnConnected();
+		void OnDisconnected(HolographicStreamerConnectionFailureReason reason);
+		void OnPreviewFrame(const ComPtr<ID3D11Texture2D>& texture);
 
         // Window event handlers.
-        void OnVisibilityChanged(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::VisibilityChangedEventArgs^ args);
-
-        // DisplayInformation event handlers.
-        void OnDpiChanged(Windows::Graphics::Display::DisplayInformation^ sender, Platform::Object^ args);
-        void OnOrientationChanged(Windows::Graphics::Display::DisplayInformation^ sender, Platform::Object^ args);
-        void OnDisplayContentsInvalidated(Windows::Graphics::Display::DisplayInformation^ sender, Platform::Object^ args);
-
-        // Other event handlers.
-        void OnCompositionScaleChanged(Windows::UI::Xaml::Controls::SwapChainPanel^ sender, Object^ args);
-        void OnSwapChainPanelSizeChanged(Platform::Object^ sender, Windows::UI::Xaml::SizeChangedEventArgs^ e);
         void Key_Down(Platform::Object^ sender, Windows::UI::Xaml::Input::KeyRoutedEventArgs^ e);
-        void Toggle_Preview(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
-        void Start_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
-        void Stop_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
-        void ipAddress_TextChanged(Platform::Object^ sender, Windows::UI::Xaml::Controls::TextChangedEventArgs^ e);
-
-        // Private methods for remoting.
-        bool ConnectToRemoteDevice();
-        void DisconnectFromRemoteDevice();
+ 
+		void Tick();
         void StartRenderLoop();
         void StopRenderLoop();
 
         // Resources used to render the remoting frame preview in the XAML page background.
-        std::shared_ptr<DX::DeviceResourcesWindowed>        m_deviceResources;
-        RemotingHostSample::AppView^                        m_appView;
         Platform::String^                                   m_ipAddress;
         Microsoft::Holographic::HolographicStreamerHelpers^ m_streamerHelpers;
 
@@ -77,11 +64,19 @@ namespace RemotingHostSample
         bool m_windowVisible        = true;
 
         // The holographic space the app will use for rendering.
-        Windows::Graphics::Holographic::HolographicSpace^   m_holographicSpace = nullptr;
+		Windows::Graphics::Holographic::HolographicSpace^   m_holographicSpace = nullptr;
+		std::shared_ptr<DX::DeviceResources>                m_deviceResources;
+		std::unique_ptr<AppMain> m_main;
+
+		std::unique_ptr<HolographicRemoteConnection> m_connector;
 
         // XAML render loop.
         Windows::Foundation::IAsyncAction^  m_renderLoopWorker;
         Concurrency::critical_section       m_criticalSection;
-    };
+	
+		void TextBox_TextChanged(Platform::Object^ sender, Windows::UI::Xaml::Controls::TextChangedEventArgs^ e);
+		void Connect_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
+		void Disconnect_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
+	};
 }
 

@@ -8,34 +8,32 @@
     mc:Ignorable="d">
 
   <SwapChainPanel x:Name="swapChainPanel">
-    <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left">
-      <TextBlock
-        x:Name="Console"
-        Text="Ready."
-        Foreground="Gray"
-        VerticalAlignment="Bottom"
-        HorizontalAlignment="Left"
-        MinWidth ="720"
-        FontSize="13"/>
-    </StackPanel>
-      
-    <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right">
-      
-      <StackPanel VerticalAlignment="Bottom" Margin="0,0,10,38">
-        <Button x:Name="TogglePreview" Content="Pause preview" FontSize="15" Background="Gray" Foreground="White" Visibility="Visible" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="Toggle_Preview" />
-      </StackPanel>
-      
-      <StackPanel Orientation="Horizontal" Background="Gray" VerticalAlignment="Bottom" Margin="0,0,10,38" >
-        <TextBlock Text="IP address: " FontSize="15" Foreground="White" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
-        <TextBox x:Name="ipAddress" Text="" FontSize="15" Background="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" 
-                InputScope="AlphanumericFullWidth" 
-                TextChanged="ipAddress_TextChanged" Width="160" 
-                AcceptsReturn="False"
-                KeyDown="Key_Down" />
-        <Button x:Name="Start" Content="Connect" FontSize="15" Background="Gray" Foreground="White" Visibility="Visible" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="Start_Click" />
-        <Button x:Name="Stop" Content="Disconnect" FontSize="15" Background="Gray" Foreground="White" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="Stop_Click"  />
-      </StackPanel>
-      
-    </StackPanel>
-  </SwapChainPanel>
+        <Grid VerticalAlignment="Top" Margin="12" Background="Gray">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition />
+                <RowDefinition />
+                <RowDefinition />
+            </Grid.RowDefinitions>
+            <TextBlock Text="IP Address"
+                       Foreground="White"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Top"
+                       FontSize="30" Margin="12"/>
+            <TextBox Grid.Column="1" Margin="12" TextChanged="TextBox_TextChanged"
+                     x:Name="IPAddressText"></TextBox>
+            <Button Content="Connect" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Right" 
+                    FontSize="30" Foreground="White" Click="Connect_Click" x:Name="ConnectButton"
+                    IsEnabled="False"/>
+            <StackPanel Orientation="Horizontal" Grid.Row="1" Grid.Column="1">
+                <ProgressRing IsActive="False" x:Name="ProgressControl"></ProgressRing>
+                <Button Content="Disconnect" Visibility="Collapsed" Click="Disconnect_Click" x:Name="DisconnectButton"/>
+                <TextBlock x:Name="StatusText"></TextBlock>
+            </StackPanel>
+            <TextBlock Grid.Row="3" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="Console"/>
+        </Grid>
+    </SwapChainPanel>
 </Page>

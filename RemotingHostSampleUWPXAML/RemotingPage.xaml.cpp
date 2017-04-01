@@ -32,6 +32,7 @@ using namespace RemotingHostSample;
 
 using namespace concurrency;
 using namespace Microsoft::Holographic;
+using namespace Windows::Graphics::Holographic;
 using namespace Microsoft::WRL;
 using namespace Platform;
 using namespace Windows::ApplicationModel;
@@ -56,37 +57,12 @@ RemotingPage::RemotingPage()
 {
     InitializeComponent();
 
-    // Register event handlers for page lifecycle.
-    CoreWindow^ window = Window::Current->CoreWindow;
+	m_deviceResources = std::make_shared<DX::DeviceResources>();
+	m_connector = std::make_unique<HolographicRemoteConnection>(m_deviceResources);
 
-    window->VisibilityChanged +=
-        ref new TypedEventHandler<CoreWindow^, VisibilityChangedEventArgs^>(this, &RemotingPage::OnVisibilityChanged);
+	m_main = std::make_unique<AppMain>(m_deviceResources);
 
-    DisplayInformation^ currentDisplayInformation = DisplayInformation::GetForCurrentView();
-
-    currentDisplayInformation->DpiChanged +=
-        ref new TypedEventHandler<DisplayInformation^, Object^>(this, &RemotingPage::OnDpiChanged);
-
-    currentDisplayInformation->OrientationChanged +=
-        ref new TypedEventHandler<DisplayInformation^, Object^>(this, &RemotingPage::OnOrientationChanged);
-
-    DisplayInformation::DisplayContentsInvalidated +=
-        ref new TypedEventHandler<DisplayInformation^, Object^>(this, &RemotingPage::OnDisplayContentsInvalidated);
-
-    swapChainPanel->CompositionScaleChanged += 
-        ref new TypedEventHandler<SwapChainPanel^, Object^>(this, &RemotingPage::OnCompositionScaleChanged);
-
-    swapChainPanel->SizeChanged +=
-        ref new SizeChangedEventHandler(this, &RemotingPage::OnSwapChainPanelSizeChanged);
-    
-    m_appView = ref new RemotingHostSample::AppView();
-
-    // At this point we have access to the device. 
-    // We can create the device-dependent resources.
-    m_deviceResources = std::make_shared<DX::DeviceResourcesWindowed>();
-    m_deviceResources->SetSwapChainPanel(swapChainPanel);
-    
-    Console->Text += "\n";
+	Console->Text += "\n";
 }
 
 RemotingPage::~RemotingPage()
@@ -112,255 +88,84 @@ void RemotingPage::LoadInternalState(IPropertySet^ state)
 
 }
 
-bool RemotingPage::ConnectToRemoteDevice()
+void RemotingPage::Tick()
 {
-    if (!m_streamerHelpers)
-    {
-        ConsoleLog(Console, L"Connecting to %s", m_ipAddress->Data());
+	if (m_main)
+	{
+		// When running on Windows Holographic, we can use the holographic rendering system.
+		HolographicFrame^ holographicFrame = m_main->Update();
 
-        m_streamerHelpers = ref new HolographicStreamerHelpers();
-        m_appView->Initialize(m_streamerHelpers->HolographicSpace, m_streamerHelpers->RemoteSpeech);
-        ComPtr<ID3D11Device4> spDevice = m_appView->GetDeviceResources()->GetD3DDevice();
-        ComPtr<ID3D11DeviceContext3> spContext = m_appView->GetDeviceResources()->GetD3DDeviceContext();
-        m_deviceResources->SetD3DDevice(spDevice.Get(), spContext.Get());
-
-        m_streamerHelpers->CreateStreamer(m_appView->GetDeviceResources()->GetD3DDevice());
-        m_streamerHelpers->OnSendFrame += ref new SendFrameEvent(
-            [this](_In_ const ComPtr<ID3D11Texture2D>& spTexture, _In_ FrameMetadata metadata)
-        {
-            if (m_showPreview)
-            {
-                ComPtr<ID3D11Device4> spDevice = m_appView->GetDeviceResources()->GetD3DDevice();
-                ComPtr<ID3D11DeviceContext3> spContext = m_appView->GetDeviceResources()->GetD3DDeviceContext();
-                
-                ComPtr<ID3D11Texture2D> spBackBuffer;
-                ThrowIfFailed(m_deviceResources->GetSwapChain()->GetBuffer(0, IID_PPV_ARGS(&spBackBuffer)));
-
-                DXGI_PRESENT_PARAMETERS parameters = { 0 };
-                ThrowIfFailed(m_deviceResources->GetSwapChain()->Present1(1, 0, &parameters));
-
-                spContext->CopySubresourceRegion(
-                    spBackBuffer.Get(), // dest
-                    0,                  // dest subresource
-                    0, 0, 0,            // dest x, y, z
-                    spTexture.Get(),    // source
-                    0,                  // source subresource
-                    nullptr);           // source box, null means the entire resource
-            }
-        });
-
-        m_streamerHelpers->OnConnected += ref new ConnectedEvent(
-            [this]()
-            {
-                ConsoleLog(Console, L"Connected.");
-            });
-
-        m_streamerHelpers->OnDisconnected += ref new DisconnectedEvent(
-            [this](_In_ HolographicStreamerConnectionFailureReason failureReason)
-            {
-                ConsoleLog(Console, L"Disconnected with reason %d", failureReason);
-
-                {
-                    critical_section::scoped_lock lock(m_criticalSection);
-                    if (!m_connectedState)
-                    {
-                        ConsoleLog(Console, L"Aborting reconnect attempt.");
-                        return;
-                    }
-                }
-
-                // Reconnect if this is a transient failure.
-                if (failureReason == HolographicStreamerConnectionFailureReason::Unreachable
-                    || failureReason == HolographicStreamerConnectionFailureReason::ConnectionLost)
-                {
-                    ConsoleLog(Console, L"Reconnecting...");
-
-                    try
-                    {
-                        m_streamerHelpers->Connect(m_ipAddress->Data(), 8001);
-                    }
-                    catch (Platform::Exception^ ex)
-                    {
-                        ConsoleLog(Console, L"Connect failed with hr = 0x%08X", ex->HResult);
-                    }
-                }
-                else
-                {
-                    ConsoleLog(Console, L"Disconnected with unrecoverable error, not attempting to reconnect.");
-                }
-            });
-
-        // We currently need to stream at 720p because that's the resolution of our remote display.
-        // There is a check in the holographic streamer that makes sure the remote and local 
-        // resolutions match. The default streamer resolution is 1080p.
-        m_streamerHelpers->SetVideoFrameSize(STREAMER_WIDTH, STREAMER_HEIGHT);
-    }
-
-    if (m_streamerHelpers)
-    {
-        try
-        {
-            ConsoleLog(Console, L"Waiting for connection...");
-            m_streamerHelpers->Connect(m_ipAddress->Data(), 8001);
-            return true;
-        }
-        catch (Platform::Exception^ ex)
-        {
-            ConsoleLog(Console, L"Connect failed with hr = 0x%08X", ex->HResult);
-        }
-    }
-
-    return false;
-}
-
-void RemotingPage::DisconnectFromRemoteDevice()
-{
-    m_streamerHelpers->Disconnect();
-    ConsoleLog(Console, L"Disconnected.");
-}
-
-// Window event handlers.
-
-void RemotingPage::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ args)
-{
-    critical_section::scoped_lock lock(m_criticalSection);
-
-    m_windowVisible = args->Visible;
-    if (m_windowVisible)
-    {
-        m_showPreview = m_priorPreviewState;
-    }
-    else
-    {
-        m_priorPreviewState = m_showPreview;
-        m_showPreview = false;
-    }
-}
-
-// DisplayInformation event handlers.
-
-void RemotingPage::OnDpiChanged(DisplayInformation^ sender, Object^ args)
-{
-    critical_section::scoped_lock lock(m_criticalSection);
-
-    // Note: The value for LogicalDpi retrieved here may not match the effective DPI of the app
-    // if it is being scaled for high resolution devices. Once the DPI is set on DeviceResources,
-    // you should always retrieve it using the GetDpi method.
-    // See DeviceResources.cpp for more details.
-    m_deviceResources->SetDpi(sender->LogicalDpi);
-}
-
-void RemotingPage::OnOrientationChanged(DisplayInformation^ sender, Object^ args)
-{
-    critical_section::scoped_lock lock(m_criticalSection);
-
-    m_deviceResources->SetCurrentOrientation(sender->CurrentOrientation);
-}
-
-void RemotingPage::OnDisplayContentsInvalidated(DisplayInformation^ sender, Object^ args)
-{
-    critical_section::scoped_lock lock(m_criticalSection);
-
-    m_deviceResources->ValidateDevice();
-}
-
-void RemotingPage::OnCompositionScaleChanged(SwapChainPanel^ sender, Object^ args)
-{
-    critical_section::scoped_lock lock(m_criticalSection);
-
-    m_deviceResources->SetCompositionScale(sender->CompositionScaleX, sender->CompositionScaleY);
-}
-
-void RemotingPage::OnSwapChainPanelSizeChanged(Object^ sender, SizeChangedEventArgs^ e)
-{
-    critical_section::scoped_lock lock(m_criticalSection);
-
-    m_deviceResources->SetLogicalSize(e->NewSize);
+		if (holographicFrame && m_main->Render(holographicFrame))
+		{
+			// The holographic frame has an API that presents the swap chain for each
+			// holographic camera.
+			m_deviceResources->Present(holographicFrame);
+		}
+	}
 }
 
 void RemotingPage::Key_Down(Platform::Object ^ sender, Windows::UI::Xaml::Input::KeyRoutedEventArgs ^ e)
 {
     if (e->Key == VirtualKey::Enter)
     {
-        Start_Click(sender, e);
+		Connect_Click(sender, e);
     }
 }
 
-void RemotingPage::Toggle_Preview(Platform::Object ^ sender, Windows::UI::Xaml::RoutedEventArgs ^ e)
-{
-    m_showPreview = !m_showPreview;
-
-    if (!m_showPreview)
-    {
-        ConsoleLog(Console, L"Preview paused.");
-        TogglePreview->Content = L"Resume preview";
-    }
-    else
-    {
-        ConsoleLog(Console, L"Preview resumed.");
-        TogglePreview->Content = L"Pause preview";
-    }
-}
-
-void RemotingPage::Start_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
-{
-    {
-        critical_section::scoped_lock lock(m_criticalSection);
-
-        if (m_connectedState == true)
-        {
-            // Already trying to connect - return "true" to break out of loop.
-            return;
-        }
-        else
-        {
-            m_connectedState = true;
-        }
-    }
-
-    if (!m_ipAddress)
-    {
-        ConsoleLog(Console, L"Error: Please set an IP address.");
-    }
-    else
-    {
-        Start->Visibility = Windows::UI::Xaml::Visibility::Collapsed;
-        ipAddress->IsEnabled = false;
-
-        while (!ConnectToRemoteDevice());
-        StartRenderLoop();
-        
-        Stop->Visibility = Windows::UI::Xaml::Visibility::Visible;
-    }
-}
-
-void RemotingPage::Stop_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
-{
-    {
-        critical_section::scoped_lock lock(m_criticalSection);
-        if (m_connectedState == false)
-        {
-            return;
-        }
-        else
-        {
-            m_connectedState = false;
-        }
-    }
-
-    Stop->Visibility = Windows::UI::Xaml::Visibility::Collapsed;
-    
-    DisconnectFromRemoteDevice();
-    StopRenderLoop();
-    
-    Start->Visibility = Windows::UI::Xaml::Visibility::Visible;
-    ipAddress->IsEnabled = true;
-}
-
-void RemotingPage::ipAddress_TextChanged(Platform::Object^ sender, Windows::UI::Xaml::Controls::TextChangedEventArgs^ e)
-{
-    m_ipAddress = ipAddress->Text;
-}
+//void RemotingPage::Start_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
+//{
+//    {
+//        critical_section::scoped_lock lock(m_criticalSection);
+//
+//        if (m_connectedState == true)
+//        {
+//            // Already trying to connect - return "true" to break out of loop.
+//            return;
+//        }
+//        else
+//        {
+//            m_connectedState = true;
+//        }
+//    }
+//
+//    if (!m_ipAddress)
+//    {
+//        ConsoleLog(Console, L"Error: Please set an IP address.");
+//    }
+//    else
+//    {
+//        Start->Visibility = Windows::UI::Xaml::Visibility::Collapsed;
+//        ipAddress->IsEnabled = false;
+//
+//        while (!ConnectToRemoteDevice());
+//        StartRenderLoop();
+//        
+//        Stop->Visibility = Windows::UI::Xaml::Visibility::Visible;
+//    }
+//}
+//
+//void RemotingPage::Stop_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
+//{
+//    {
+//        critical_section::scoped_lock lock(m_criticalSection);
+//        if (m_connectedState == false)
+//        {
+//            return;
+//        }
+//        else
+//        {
+//            m_connectedState = false;
+//        }
+//    }
+//
+//    Stop->Visibility = Windows::UI::Xaml::Visibility::Collapsed;
+//    
+//    DisconnectFromRemoteDevice();
+//    StopRenderLoop();
+//    
+//    Start->Visibility = Windows::UI::Xaml::Visibility::Visible;
+//    ipAddress->IsEnabled = true;
+//}
 
 void RemotingPage::StartRenderLoop()
 {
@@ -378,7 +183,7 @@ void RemotingPage::StartRenderLoop()
         {
             critical_section::scoped_lock lock(m_criticalSection);
 
-            m_appView->Tick();
+            Tick();
         }
     });
 
@@ -392,6 +197,88 @@ void RemotingPage::StopRenderLoop()
     {
         m_renderLoopWorker->Cancel();
     }
+}
+
+#include <Ws2tcpip.h>
+
+bool validateIpAddress(const wchar_t& ipAddress)
+{
+	struct sockaddr_in sa;
+	int result = InetPton(AF_INET, &ipAddress, &(sa.sin_addr));
+	return result != 0;
+}
+
+void RemotingPage::TextBox_TextChanged(Platform::Object^ sender, Windows::UI::Xaml::Controls::TextChangedEventArgs^ e)
+{
+	if (IPAddressText->Text->Length() <= 0 || !validateIpAddress(*IPAddressText->Text->Data()))
+	{
+		ConnectButton->IsEnabled = false;
+		return;
+	}
+
+	ConnectButton->IsEnabled = true;
+}
+
+void RemotingPage::OnInit(HolographicSpace ^ space, RemoteSpeech ^ speech)
+{
+	m_holographicSpace = space;
+	m_deviceResources->SetHolographicSpace(space);
+	m_main->SetHolographicSpace(space);
+
+	if (speech)
+	{
+		m_main->SetSpeechWrapper(speech);
+	}
+}
+
+void RemotingPage::OnConnected()
+{
+	StartRenderLoop();
+
+	this->Dispatcher->RunAsync(
+		Windows::UI::Core::CoreDispatcherPriority::Normal,
+		ref new Windows::UI::Core::DispatchedHandler([this]()
+	{
+		StatusText->Text = "Connected";
+		ProgressControl->IsActive = false;
+		DisconnectButton->Visibility = Windows::UI::Xaml::Visibility::Visible;
+	}));
+}
+
+void RemotingPage::OnDisconnected(HolographicStreamerConnectionFailureReason reason)
+{
+	this->Dispatcher->RunAsync(
+		Windows::UI::Core::CoreDispatcherPriority::Normal,
+		ref new Windows::UI::Core::DispatchedHandler([this]()
+	{
+		StatusText->Text = "";
+		ProgressControl->IsActive = false;
+		DisconnectButton->Visibility = Windows::UI::Xaml::Visibility::Collapsed;
+	}));
+}
+
+void RemotingPage::OnPreviewFrame(const ComPtr<ID3D11Texture2D>& texture)
+{
+}
+
+void RemotingPage::Connect_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
+{
+	ProgressControl->IsActive = true;
+	m_connector->Connect(IPAddressText->Text,
+		[this](HolographicSpace^ space, RemoteSpeech^ speech) { this->OnInit(space, speech); },
+		[this]() { this->OnConnected(); },
+		[this](HolographicStreamerConnectionFailureReason reason) { this->OnDisconnected(reason); },
+		[this](const ComPtr<ID3D11Texture2D>& texture) { this->OnPreviewFrame(texture); });
+}
+
+void RemotingPage::Disconnect_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
+{
+	StatusText->Text = "Disconnecting...";
+	ProgressControl->IsActive = true;
+	m_connector->Disconnect();
+
+	// Call here as we never get called when we disconnect..
+	OnDisconnected(HolographicStreamerConnectionFailureReason::None);
 }
 
 static void ConsoleLog(Windows::UI::Xaml::Controls::TextBlock^ Console, _In_z_ LPCWSTR format, ...)
